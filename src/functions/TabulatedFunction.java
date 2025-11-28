@@ -10,24 +10,22 @@ public class TabulatedFunction {
     // первый конструктор по заданию
     public TabulatedFunction(double leftX, double rightX, int pointsCount) {
         this.points = new FunctionPoint[pointsCount]; // создаем объект для массива точек
+        this.pointsCount = pointsCount; // инициализируем количество точек
         double step = (rightX - leftX) / (pointsCount - 1); // считаем шаг между точками
         for (int i = 0; i < pointsCount; i++) {
             double x_c = leftX + i * step;// считаем координату x
             points[i] = new FunctionPoint(x_c, 0);// записываем наши точки в объект вида массива
         }
-
-
     }
-
     // второй конструктор по заданию
     public TabulatedFunction(double leftX, double rightX, double[] values) {
         this.points = new FunctionPoint[values.length]; // создаем объект для массива точек
+        this.pointsCount = values.length; // инициализируем количество точек
         double step = (rightX - leftX) / (values.length - 1); // считаем шаг между точками
         for (int i = 0; i < values.length; i++) {
             double x_c = leftX + i * step; // считаем координату x
             points[i] = new FunctionPoint(x_c, values[i]); // записываем наши точки в объект вида массива
         }
-
     }
 
     /* 4 ЗАДАНИЕ */
@@ -38,33 +36,54 @@ public class TabulatedFunction {
 
     // метод для возращения самой правой границы области определения
     public double getRightDomainBorder() {
-        return points[points.length - 1].getX();
+        return points[pointsCount - 1].getX();
     }
 
     // метод для получения значение функции в точке x, если эта точка лежит в области определения функции
     public double getFunctionValue(double x) {
-        if (x >= points[0].getX() && x <= points[points.length - 1].getX()) // проверка лежит ли эта точки  в области определения функции
-        {
-            // если лежит то проходим по массиву и используем линейную интерполярию для нахождения  значения
-            for (int i = 0; i < points.length - 1; i++) {
-                if (x >= points[i].getX() && x <= points[i + 1].getX()) {
-                    double x1 = points[i].getX();
-                    double y1 = points[i].getY();
-                    double x2 = points[i + 1].getX();
-                    double y2 = points[i + 1].getY();
-                    return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
-                }
-            }
-        } else { // иначе, возвращаем значение неопределённости
+        // значение эпсилон как константа
+        final double EPSILON = 1e-10;
+
+        // проверка на пустоту и на существование(без нее у меня ломалось)
+        if (points == null || pointsCount == 0) {
             return Double.NaN;
         }
-        return Double.NaN; // возвращаем значение неопределённости в случае если массив пуст итд
+
+        // получаем промежутки для проверки границ
+        double leftX = points[0].getX();
+        double rightX = points[pointsCount - 1].getX();
+
+        // проверка границ с переменной эпсилон
+        if ((x < (leftX - EPSILON)) || (x > (rightX + EPSILON))) {
+            return Double.NaN;
+        }
+
+        for (int i = 0; i < pointsCount; i++) {
+            if (Math.abs(x - points[i].getX()) < EPSILON) {
+                return points[i].getY(); // возвращаем соответствующий y (также у меня не было вроде)
+            }
+        }
+
+        // ищем интервал с учетом эпсилон для интерполяции
+        for (int i = 0; i < pointsCount - 1; i++) {
+            double x1 = points[i].getX();
+            double x2 = points[i + 1].getX();
+
+            // ищем значения x с учетом эпсилон
+            if (x >= x1 - EPSILON && x <= x2 + EPSILON) {
+                double y1 = points[i].getY();
+                double y2 = points[i + 1].getY();
+                return y1 + (y2 - y1) * (x - x1) / (x2 - x1);
+            }
+        }
+
+        return Double.NaN; // возвращаем на всякий случай
     }
 
     /* 5 ЗАДАНИЕ */
     // метод для получения количества точек
     public int getPointsCount() {
-        return points.length;
+        return pointsCount;
     }
 
     // метод для получения копии точки
@@ -92,7 +111,7 @@ public class TabulatedFunction {
         // проверяем что новый х между соседними точками
         if (index > 0 && point.getX() <= points[index - 1].getX())
             return;
-        if (index < points.length - 1 && point.getX() >= points[index + 1].getX())
+        if (index < pointsCount - 1 && point.getX() >= points[index + 1].getX())
             return;
 
         points[index] = new FunctionPoint(point);  // сохраняем копию
@@ -102,7 +121,7 @@ public class TabulatedFunction {
     public void setPointX(int index, double x) {
         // аналогичная проверка как и в SetPoint
         if (index > 0 && x <= points[index - 1].getX()) return;
-        if (index < points.length - 1 && x >= points[index + 1].getX()) return;
+        if (index < pointsCount - 1 && x >= points[index + 1].getX()) return;
 
         points[index].setX(x);
     }
@@ -111,11 +130,10 @@ public class TabulatedFunction {
     // метод для удаления заданной точки
     public void deletePoint(int index) {
         // cдвигаем все точки после удаляемой влево
-        for (int i = index; i < points.length - 1; i++) {
+        for (int i = index; i < pointsCount - 1; i++) {
             points[i] = points[i + 1];
         }
         pointsCount--;
-
     }
 
     public void addPoint(FunctionPoint point) {
@@ -126,16 +144,13 @@ public class TabulatedFunction {
             System.arraycopy(points, 0, newPoints, 0, pointsCount);
             points = newPoints;
         }
-
         // ищем позицию для вставки x
         int pos = 0;
         while (pos < pointsCount && points[pos].getX() < point.getX()) {
             pos++;
         }
-
         // сдвигаем точки вправо, чтобы освободить место для новой точки
         System.arraycopy(points, pos, points, pos + 1, pointsCount - pos);
-
         // вставляем новую точку
         points[pos] = new FunctionPoint(point);
         pointsCount++;
